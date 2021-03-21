@@ -14,7 +14,7 @@
   <noscript>You need to enable JavaScript to view this site.</noscript>
 
   <script id="vertexShader" type="x-shader/x-vertex">#version 300 es
-    precision highp float;
+    precision mediump float;
     layout(location = 0) in vec3 aPos;
 
     out vec2 uv;
@@ -30,8 +30,7 @@
   </script>
 
   <script id="fragmentShader" type="x-shader/x-fragment">#version 300 es
-    
-    precision highp float;
+    precision mediump  float;
     #define MAX_ITERATIONS 255.0
     #define S(a, b, t) smoothstep(a, b, t)
     
@@ -41,6 +40,7 @@
     uniform vec4 u_bounds;
     uniform float u_time;
     uniform float u_Size;
+    uniform sampler2D u_Sampler;
     
     float map(float value, float min1, float max1, float min2, float max2) {
         return min2 + (value - min1) * (max2 - min2) / (max1 - min1);
@@ -87,6 +87,10 @@
       FragColor += fogTrail * 0.5f;
       FragColor += trail;
       FragColor += drop;
+      // FragColor.yz = uv.xy;
+      FragColor = texture(u_Sampler, uv);
+      // texture2D(u_Sampler, uv);
+      // FragColor = texture2D(u_Sampler, uv.xy);
       // if(gv.x > 0.48f || gv.y > 0.49f) {
       //   FragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
       // } 

@@ -205,6 +205,7 @@ class Animation {
   psize = 5.0;
   startTime = 0.0;
   time = 0.0;
+  texture = null;
 
   // Uniforms
 
@@ -212,6 +213,7 @@ class Animation {
   u_lBounds = null;
   u_time = null;
   u_Size = null;
+  u_Sampler = null;
 
   init() {
     this.createCanvas();
@@ -326,6 +328,7 @@ class Animation {
     this.u_lBounds = gl.getUniformLocation(program, "u_bounds");
     this.u_time = gl.getUniformLocation(program, "u_time");
     this.u_Size = gl.getUniformLocation(program, "u_Size");
+    this.u_Sampler = gl.getUniformLocation(program, "u_Sampler");
 
     this.setCanvasSize();
     window.addEventListener(`resize`, () => {
@@ -339,6 +342,10 @@ class Animation {
     //this.cnv.addEventListener("mouseup", this.clearZoom);
     //this.cnv.addEventListener("mouseleave", this.clearZoom);
     //this.cnv.addEventListener("mouseout", this.clearZoom);
+
+    this.texture = loadTexture(gl, "img/bg.png");
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.texture);
   }
 
   setCanvasSize() {
@@ -360,6 +367,8 @@ class Animation {
     gl.uniform4f(this.u_lBounds, this.xmin, this.xmax, this.ymin, this.ymax);
     gl.uniform1f(this.u_time, this.time);
     gl.uniform1f(this.u_Size, this.psize);
+
+    gl.uniform1i(this.u_Sampler, 0);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
