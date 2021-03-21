@@ -1,7 +1,7 @@
 "use strict";
 
 const config = {
-  shut: true,
+  shut: false,
 };
 
 function hexToRgb(hex) {
@@ -90,12 +90,81 @@ function mapArrValue(arr, val, max) {
   return ret;
 }
 
+//
+// Initialize a texture and load an image.
+// When the image finished loading copy it into the texture.
+//
+function loadTexture(gl, url) {
+  const texture = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, texture);
+
+  // Because images have to be downloaded over the internet
+  // they might take a moment until they are ready.
+  // Until then put a single pixel in the texture so we can
+  // use it immediately. When the image has finished downloading
+  // we'll update the texture with the contents of the image.
+  const level = 0;
+  const internalFormat = gl.RGBA;
+  const width = 1;
+  const height = 1;
+  const border = 0;
+  const srcFormat = gl.RGBA;
+  const srcType = gl.UNSIGNED_BYTE;
+  const pixel = new Uint8Array([0, 0, 255, 255]); // opaque blue
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    level,
+    internalFormat,
+    width,
+    height,
+    border,
+    srcFormat,
+    srcType,
+    pixel
+  );
+
+  const image = new Image();
+  image.onload = function () {
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      level,
+      internalFormat,
+      srcFormat,
+      srcType,
+      image
+    );
+
+    // WebGL1 has different requirements for power of 2 images
+    // vs non power of 2 images so check if the image is a
+    // power of 2 in both dimensions.
+    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+      // Yes, it's a power of 2. Generate mips.
+      gl.generateMipmap(gl.TEXTURE_2D);
+    } else {
+      // No, it's not a power of 2. Turn off mips and set
+      // wrapping to clamp to edge
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    }
+  };
+  image.src = url;
+
+  return texture;
+}
+
+function isPowerOf2(value) {
+  return (value & (value - 1)) == 0;
+}
+
 class Animation {
   cnv = null;
   ctx = null;
   size = { w: 0, h: 0, cx: 0, cy: 0 };
 
   lastFrameTime = 0;
+  currentFrameTime = 0;
   fps = 60;
   fpsHistory = [];
 
@@ -105,6 +174,7 @@ class Animation {
   stop_zooming = true;
   zoom_factor = 1.0;
   max_iterations = 500;
+
   proj = [
     1.0,
     0.0,
@@ -129,15 +199,19 @@ class Animation {
   ymin = -1.5;
   ymax = 1.5;
 
-  time = 0;
   zoom = true;
   zoomInterval = undefined;
   interval = 50;
+  psize = 5.0;
+  startTime = 0.0;
+  time = 0.0;
 
   // Uniforms
 
-  lBounds = null;
-  timeUniform = null;
+  u_MVP = null;
+  u_lBounds = null;
+  u_time = null;
+  u_Size = null;
 
   init() {
     this.createCanvas();
@@ -248,19 +322,23 @@ class Animation {
     gl.enableVertexAttribArray(position_attrib_location);
     gl.vertexAttribPointer(position_attrib_location, 3, gl.FLOAT, false, 0, 0);
 
-    this.lMVP = gl.getUniformLocation(program, "u_MVP");
-    this.lBounds = gl.getUniformLocation(program, "u_bounds");
-    this.timeUniform = gl.getUniformLocation(program, "u_time");
+    this.u_MVP = gl.getUniformLocation(program, "u_MVP");
+    this.u_lBounds = gl.getUniformLocation(program, "u_bounds");
+    this.u_time = gl.getUniformLocation(program, "u_time");
+    this.u_Size = gl.getUniformLocation(program, "u_Size");
 
     this.setCanvasSize();
     window.addEventListener(`resize`, () => {
       this.setCanvasSize();
     });
-    this.cnv.addEventListener("mousedown", this.onmousedown);
-    this.cnv.addEventListener("contextmenu", this.onmousedown);
-    this.cnv.addEventListener("mouseup", this.clearZoom);
-    this.cnv.addEventListener("mouseleave", this.clearZoom);
-    this.cnv.addEventListener("mouseout", this.clearZoom);
+
+    this.startTime = Date.now();
+
+    //this.cnv.addEventListener("mousedown", this.onmousedown);
+    //this.cnv.addEventListener("contextmenu", this.onmousedown);
+    //this.cnv.addEventListener("mouseup", this.clearZoom);
+    //this.cnv.addEventListener("mouseleave", this.clearZoom);
+    //this.cnv.addEventListener("mouseout", this.clearZoom);
   }
 
   setCanvasSize() {
@@ -274,13 +352,14 @@ class Animation {
   updateCanvas() {
     const gl = this.ctx;
 
-    const currentTime = Date.now();
+    this.time = (Date.now() - this.startTime) / 1000.0;
 
     this.calculateMVP();
 
-    gl.uniformMatrix4fv(this.lMVP, false, this.proj);
-    gl.uniform4f(this.lBounds, this.xmin, this.xmax, this.ymin, this.ymax);
-    gl.uniform1i(this.timeUniform, currentTime);
+    gl.uniformMatrix4fv(this.u_MVP, false, this.proj);
+    gl.uniform4f(this.u_lBounds, this.xmin, this.xmax, this.ymin, this.ymax);
+    gl.uniform1f(this.u_time, this.time);
+    gl.uniform1f(this.u_Size, this.psize);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
@@ -305,7 +384,7 @@ class Animation {
 
   onZooming = () => {
     let factor = 1;
-    let step = Math.max(this.time, this.interval) / 1000.0;
+    let step = Math.max(this.currentFrameTime, this.interval) / 1000.0;
 
     if (this.zoom === true) {
       factor -= step;
@@ -338,18 +417,18 @@ class Animation {
 
   calculateFps() {
     if (this.lastFrameTime == 0) {
-      this.lastFrameTime = Date.now();
+      this.lastFrameTime = this.time;
     } else {
-      this.time = Date.now() - this.lastFrameTime;
-      this.fpsHistory.push((1 / this.time) * 1000);
-      this.lastFrameTime = Date.now();
+      this.currentFrameTime = this.time - this.lastFrameTime;
+      this.fpsHistory.push(1 / this.currentFrameTime);
+      this.lastFrameTime = this.time;
       if (this.fpsHistory.length > 20) {
         const sum = this.fpsHistory.reduce((a, b) => a + b, 0);
         const avg = sum / this.fpsHistory.length || 0;
         this.fps = avg;
         this.fpsHistory = [];
         if (config.shut !== true) {
-          console.log("Animation fps ", this.fps);
+          console.log("Animation fps ", Math.round(this.fps, 0));
         }
       }
     }
