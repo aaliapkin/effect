@@ -134,6 +134,11 @@ class Animation {
   zoomInterval = undefined;
   interval = 50;
 
+  // Uniforms
+
+  lBounds = null;
+  timeUniform = null;
+
   init() {
     this.createCanvas();
     this.updateAnimation();
@@ -245,6 +250,7 @@ class Animation {
 
     this.lMVP = gl.getUniformLocation(program, "u_MVP");
     this.lBounds = gl.getUniformLocation(program, "u_bounds");
+    this.timeUniform = gl.getUniformLocation(program, "u_time");
 
     this.setCanvasSize();
     window.addEventListener(`resize`, () => {
@@ -268,10 +274,13 @@ class Animation {
   updateCanvas() {
     const gl = this.ctx;
 
+    const currentTime = Date.now();
+
     this.calculateMVP();
 
     gl.uniformMatrix4fv(this.lMVP, false, this.proj);
     gl.uniform4f(this.lBounds, this.xmin, this.xmax, this.ymin, this.ymax);
+    gl.uniform1i(this.timeUniform, currentTime);
 
     gl.clearColor(0.0, 0.0, 0.0, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
