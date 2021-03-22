@@ -14,23 +14,23 @@
   <noscript>You need to enable JavaScript to view this site.</noscript>
 
   <script id="vertexShader" type="x-shader/x-vertex">#version 300 es
-    precision mediump float;
-    layout(location = 0) in vec3 aPos;
+    precision highp float;
+    layout(location = 0) in vec2 aPos;
 
     out vec2 uv;
 
     uniform mat4 u_MVP;
 
     void main() {
-      gl_Position = vec4(aPos, 1.0);
+      gl_Position = vec4(aPos, 0.0, 1.0);
       vec4 uv_out =  inverse(u_MVP) * gl_Position;
-      uv = vec2(uv_out.x, uv_out.y);
+      uv = uv_out.xy;
     }
     
   </script>
 
   <script id="fragmentShader" type="x-shader/x-fragment">#version 300 es
-    precision mediump  float;
+    precision highp float;
     #define MAX_ITERATIONS 255.0
     #define S(a, b, t) smoothstep(a, b, t)
     
@@ -51,14 +51,17 @@
       p += dot(p, p + 34.345f);
       return fract(p.x * p.y);      
     }
-    
+
     void main()
     {
-      FragColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+      float Pi = 6.28318530718;
+
+      FragColor = vec4(0.0f);
       float t = mod(u_time, 72000.0f);
 
       vec2 asp = vec2(2.0f, 1.0f); // y: 2, x: 1
       vec2 uv1 = uv * u_Size * asp;
+      uv1.y = -uv1.y;
       uv1.y += t * .25f;
       vec2 gv = fract(uv1) - .5f;
       vec2 id = floor(uv1);
@@ -83,18 +86,25 @@
       trail *= fogTrail;
       fogTrail *= S(0.05f, 0.04f, abs(dropPos.x));
 
+      float dist = -.5f;
+      vec2 offs = uv + vec2(0.5f, 0.5f) + (drop * dropPos + trail * trailPos) * dist;
+      float blur = (1.0f - fogTrail);
+      
+      float Directions = 8.0; // BLUR DIRECTIONS (Default 16.0 - More is better but slower)
+      float Quality = 3.0; // BLUR QUALITY (Default 4.0 - More is better but slower)
+      float Size = 8.0; // BLUR SIZE (Radius)
+      vec2 Radius = vec2(.02f);
+      vec4 Color = texture(u_Sampler, offs, 4.0f);
 
-      FragColor += fogTrail * 0.5f;
-      FragColor += trail;
-      FragColor += drop;
-      // FragColor.yz = uv.xy;
-      FragColor = texture(u_Sampler, uv);
-      // texture2D(u_Sampler, uv);
-      // FragColor = texture2D(u_Sampler, uv.xy);
-      // if(gv.x > 0.48f || gv.y > 0.49f) {
-      //   FragColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);
-      // } 
-      // FragColor += N21(id);
+      for(float d = 0.0; d < Pi; d += Pi/Directions) {
+        for(float i = 1.0 / Quality; i <= 1.0; i += 1.0 / Quality) {
+          Color += texture(u_Sampler, offs + vec2(cos(d), sin(d)) * Radius * i, 4.0f);		
+        }
+      }
+
+      Color /= Quality * Directions;
+      vec4 BaseColor = texture(u_Sampler, offs);
+      FragColor = mix(BaseColor, Color, blur);
     }
 
   </script>

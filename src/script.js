@@ -135,19 +135,27 @@ function loadTexture(gl, url) {
       image
     );
 
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(
+      gl.TEXTURE_2D,
+      gl.TEXTURE_MIN_FILTER,
+      gl.LINEAR_MIPMAP_LINEAR
+    );
+
     // WebGL1 has different requirements for power of 2 images
     // vs non power of 2 images so check if the image is a
     // power of 2 in both dimensions.
-    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
-      // Yes, it's a power of 2. Generate mips.
-      gl.generateMipmap(gl.TEXTURE_2D);
-    } else {
-      // No, it's not a power of 2. Turn off mips and set
-      // wrapping to clamp to edge
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    }
+    // if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+    //   // Yes, it's a power of 2. Generate mips.
+    //   gl.generateMipmap(gl.TEXTURE_2D);
+    // } else {
+    //   // No, it's not a power of 2. Turn off mips and set
+    //   // wrapping to clamp to edge
+    //   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    //   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    //   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    //   gl.generateMipmap(gl.TEXTURE_2D);
+    // }
   };
   image.src = url;
 
@@ -202,7 +210,7 @@ class Animation {
   zoom = true;
   zoomInterval = undefined;
   interval = 50;
-  psize = 5.0;
+  psize = 10.0;
   startTime = 0.0;
   time = 0.0;
   texture = null;
@@ -223,10 +231,10 @@ class Animation {
   calculateMVP() {
     let left, right, top, bottom, far, near;
     const ratio = this.size.h / this.size.w;
-    left = -1;
+    left = 0;
     right = 1;
-    bottom = -ratio;
-    top = ratio;
+    bottom = ratio;
+    top = 0;
     near = -1.0;
     far = 1.0;
     this.proj = [
@@ -295,20 +303,7 @@ class Animation {
 
     const vertexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-    const positions = [
-      -1.0,
-      -1.0,
-      0.0,
-      1.0,
-      -1.0,
-      0.0,
-      1.0,
-      1.0,
-      0.0,
-      -1.0,
-      1.0,
-      0.0,
-    ];
+    const positions = [-1.1, -1.1, 1.0, -1.1, 1.0, 1.0, -1.0, 1.0];
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
     const indexBuffer = gl.createBuffer();
@@ -322,7 +317,7 @@ class Animation {
 
     const position_attrib_location = gl.getAttribLocation(program, "aPos");
     gl.enableVertexAttribArray(position_attrib_location);
-    gl.vertexAttribPointer(position_attrib_location, 3, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(position_attrib_location, 2, gl.FLOAT, false, 0, 0);
 
     this.u_MVP = gl.getUniformLocation(program, "u_MVP");
     this.u_lBounds = gl.getUniformLocation(program, "u_bounds");
@@ -343,7 +338,7 @@ class Animation {
     //this.cnv.addEventListener("mouseleave", this.clearZoom);
     //this.cnv.addEventListener("mouseout", this.clearZoom);
 
-    this.texture = loadTexture(gl, "img/bg.png");
+    this.texture = loadTexture(gl, "img/bg1.jpg");
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.texture);
   }
