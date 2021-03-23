@@ -210,7 +210,7 @@ class Animation {
   zoom = true;
   zoomInterval = undefined;
   interval = 50;
-  psize = 10.0;
+  psize = 5.0;
   startTime = 0.0;
   time = 0.0;
   texture = null;
